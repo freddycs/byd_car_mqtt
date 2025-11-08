@@ -1,0 +1,11 @@
+{
+  "domain": "byd_car_mqtt",
+  "name": "BYD Car MQTT Status",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/yourusername/byd_car_mqtt_ha/blob/main/README.md",
+  "issue_tracker": "https://github.com/yourusername/byd_car_mqtt_ha/issues",
+  "dependencies": ["mqtt"],
+  "requirements": [],
+  "codeowners": ["@yourusername"]
+}
