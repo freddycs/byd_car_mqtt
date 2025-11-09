@@ -1,11 +1,12 @@
 {
   "domain": "byd_car_mqtt",
   "name": "BYD Car MQTT Status",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "config_flow": true,
-  "documentation": "https://github.com/yourusername/byd_car_mqtt_ha/blob/main/README.md",
-  "issue_tracker": "https://github.com/yourusername/byd_car_mqtt_ha/issues",
+  "documentation": "https://github.com/freddycs/byd_car_mqtt_ha/blob/main/README.md",
+  "issue_tracker": "https://github.com/freddycs/byd_car_mqtt_ha/issues",
   "dependencies": ["mqtt"],
   "requirements": [],
-  "codeowners": ["@yourusername"]
+  "codeowners": ["@freddycs"]
+
 }
