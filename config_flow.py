@@ -2,20 +2,24 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
+from homeassistant.helpers import config_validation as cv # <-- Added for float validation
 
 from .const import (
     DOMAIN, 
     # Import all necessary configuration constants
-    CONF_MQTT_TOPIC_SUBSCRIBE, # <-- Added this missing import
+    CONF_MQTT_TOPIC_SUBSCRIBE, 
     CONF_MQTT_TOPIC_COMMAND, 
     CONF_CAR_UNIQUE_ID,
-    CONF_ENABLE_DRIVER_VENT,     # <-- NEW
-    CONF_ENABLE_PASSENGER_VENT,  # <-- NEW
+    CONF_ENABLE_DRIVER_VENT,
+    CONF_ENABLE_PASSENGER_VENT,
+    # --- NEW CONSTANTS FOR BATTERY CAPACITY ---
+    CONF_MAX_BATTERY_CAPACITY_KWH, 
+    DEFAULT_MAX_BATTERY_CAPACITY_KWH, 
 )
 
 # --- STEP 1: Core Setup Schema (Mandatory Fields) ---
 CORE_SETUP_SCHEMA = vol.Schema({
-    # The topic HA listens to for status updates (using the imported const name)
+    # The topic HA listens to for status updates
     vol.Required(CONF_MQTT_TOPIC_SUBSCRIBE, default="/dolphinc"): str,
     
     # The topic HA publishes commands to
@@ -26,6 +30,12 @@ CORE_SETUP_SCHEMA = vol.Schema({
     
     # The default name for the device
     vol.Required("model_name", default="BYD Dolphin"): str, 
+    
+    # --- NEW: Configurable Battery Capacity (e.g., 60.48 for Extended Range, 44.9 for Standard) ---
+    vol.Required(
+        CONF_MAX_BATTERY_CAPACITY_KWH, 
+        default=DEFAULT_MAX_BATTERY_CAPACITY_KWH
+    ): vol.All(vol.Coerce(float), vol.Range(min=20.0, max=100.0)), # Enforce float, set reasonable range
 })
 
 
@@ -95,33 +105,55 @@ class BYDCarMQTTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow for BYD Car MQTT."""
+    """Options flow for BYD Car MQTT, managing toggles and battery capacity."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        # --- FIX FOR DEPRECATION WARNING: Call parent __init__ and remove manual config_entry assignment. ---
+        super().__init__(config_entry)
+        
+        # self.config_entry is now automatically set by super().__init__(config_entry)
+        # We also use self.options, which is automatically set as a copy of config_entry.options
+        
+        # Consolidate data from both 'data' (initial setup) and 'options' (previous config changes)
+        # Use self.config_entry and self.options, which are available after super() call.
+        self.config_data = dict(self.config_entry.data)
+        self.config_data.update(self.options)
+
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
-        # For now, we only show the new optional features here.
-        
-        # Load current options/data to pre-fill the form
-        data = {
-            CONF_ENABLE_DRIVER_VENT: self.config_entry.data.get(CONF_ENABLE_DRIVER_VENT, True),
-            CONF_ENABLE_PASSENGER_VENT: self.config_entry.data.get(CONF_ENABLE_PASSENGER_VENT, True),
-        }
-        
-        # Merge into a schema with current values as defaults
+        if user_input is not None:
+            # Save the new input directly to the options dictionary
+            self.options.update(user_input)
+            
+            # Return entry with updated options. This will cause the integration to reload.
+            # Use self.options, which is the dictionary managed by the OptionsFlow class.
+            return self.async_create_entry(title="", data=self.options)
+
+        # --- Define the Options Form Schema ---
         options_schema = vol.Schema({
-            vol.Optional(CONF_ENABLE_DRIVER_VENT, default=data[CONF_ENABLE_DRIVER_VENT]): bool,
-            vol.Optional(CONF_ENABLE_PASSENGER_VENT, default=data[CONF_ENABLE_PASSENGER_VENT]): bool,
+            # 1. Driver Vent Toggle
+            vol.Optional(
+                CONF_ENABLE_DRIVER_VENT, 
+                default=self.config_data.get(CONF_ENABLE_DRIVER_VENT, True)
+            ): bool,
+            
+            # 2. Passenger Vent Toggle
+            vol.Optional(
+                CONF_ENABLE_PASSENGER_VENT, 
+                default=self.config_data.get(CONF_ENABLE_PASSENGER_VENT, True)
+            ): bool,
+
+            # 3. Battery Capacity (NEW)
+            vol.Required(
+                CONF_MAX_BATTERY_CAPACITY_KWH,
+                default=self.config_data.get(CONF_MAX_BATTERY_CAPACITY_KWH, DEFAULT_MAX_BATTERY_CAPACITY_KWH)
+            ): vol.All(vol.Coerce(float), vol.Range(min=20.0, max=100.0)),
         })
 
-        if user_input is not None:
-            # Create a new entry with updated data
-            new_data = self.config_entry.data.copy()
-            new_data.update(user_input)
-            return self.async_create_entry(title=self.config_entry.title, data=new_data)
-
-
-        return self.async_show_form(step_id="init", data_schema=options_schema)
+        return self.async_show_form(
+            step_id="init", 
+            data_schema=options_schema,
+            description_placeholders={"model": self.config_entry.title}
+        )

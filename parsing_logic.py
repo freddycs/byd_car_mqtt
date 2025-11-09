@@ -22,8 +22,9 @@ def parse_byd_payload(raw_payload: str) -> dict:
         "mileage_km": r"总里程\(km\)：\s*([\d\.]+)", 
         
         # Status Detection Data (from the second message type, likely '能耗提醒' or general update)
-        "battery_percent": r"电量\(%\)：\s*([\d\.]+)",
-        "battery_energy_kwh_current": r"电量\(kwh\)：\s*([\d\.]+)",
+        # --- UPDATED KEYS TO MATCH 'sensor.py' STATUS REPORT SENSORS ---
+        "battery_percent_report": r"电量\(%\)：\s*([\d\.]+)",
+        "battery_energy_kwh_report": r"电量\(kwh\)：\s*([\d\.]+)",
         "remaining_range_km": r"电量剩余里程\(km\)：\s*([\d\.]+)",
         "battery_health": r"电池健康：\s*(\d+)",
         
