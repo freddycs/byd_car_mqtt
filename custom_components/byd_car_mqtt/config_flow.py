@@ -2,7 +2,8 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.helpers import config_validation as cv # <-- Added for float validation
+from homeassistant.helpers import config_validation as cv 
+from homeassistant.config_entries import ConfigEntry
 
 from .const import (
     DOMAIN, 
@@ -61,6 +62,12 @@ class BYDCarMQTTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Store data from step 1 and proceed to step 2
             self._config_data.update(user_input)
+            
+            # Use the car unique ID for the set_unique_id call, as the model_name may change
+            car_unique_id = user_input.get(CONF_CAR_UNIQUE_ID)
+            await self.async_set_unique_id(car_unique_id)
+            self._abort_if_unique_id_configured()
+            
             return await self.async_step_optional_features()
 
         # Show the form to the user
@@ -79,11 +86,6 @@ class BYDCarMQTTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             final_data = self._config_data.copy()
             final_data.update(user_input)
 
-            # Create a stable unique ID for the config entry based on the model name
-            model_unique_id = final_data["model_name"].lower().replace(" ", "_")
-            await self.async_set_unique_id(model_unique_id)
-            self._abort_if_unique_id_configured()
-
             # Create the config entry, storing all data
             return self.async_create_entry(
                 title=final_data["model_name"], 
@@ -99,7 +101,7 @@ class BYDCarMQTTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry):
+    def async_get_options_flow(config_entry: ConfigEntry):
         """Get the options flow for this handler (Optional for minor changes)."""
         return OptionsFlowHandler(config_entry)
 
@@ -109,46 +111,49 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        # --- FIX FOR DEPRECATION WARNING: Call parent __init__ and remove manual config_entry assignment. ---
-        super().__init__(config_entry)
+        # Fix 1: Call parent constructor with no arguments
+        super().__init__() 
         
-        # self.config_entry is now automatically set by super().__init__(config_entry)
-        # We also use self.options, which is automatically set as a copy of config_entry.options
-        
-        # Consolidate data from both 'data' (initial setup) and 'options' (previous config changes)
-        # Use self.config_entry and self.options, which are available after super() call.
-        self.config_data = dict(self.config_entry.data)
-        self.config_data.update(self.options)
+        # Store the config_entry locally
+        self.config_entry = config_entry
 
 
     async def async_step_init(self, user_input=None):
-        """Manage the options."""
+        """Manage the options. Safe place to access self.options and self.config_entry."""
+        
+        # Consolidate data from both 'data' (initial setup) and 'options' (previous config changes)
+        config_data = dict(self.config_entry.data)
+        
+        # FIX 2: Access options via self.config_entry.options, not self.options, 
+        # to guarantee the property exists and is initialized.
+        config_data.update(self.config_entry.options) 
+
         if user_input is not None:
             # Save the new input directly to the options dictionary
-            self.options.update(user_input)
-            
-            # Return entry with updated options. This will cause the integration to reload.
-            # Use self.options, which is the dictionary managed by the OptionsFlow class.
-            return self.async_create_entry(title="", data=self.options)
+            # Returning user_input as data will save it to the entry's options
+            return self.async_create_entry(title="", data=user_input)
 
         # --- Define the Options Form Schema ---
         options_schema = vol.Schema({
             # 1. Driver Vent Toggle
             vol.Optional(
                 CONF_ENABLE_DRIVER_VENT, 
-                default=self.config_data.get(CONF_ENABLE_DRIVER_VENT, True)
+                # Use the combined config_data to get the current state
+                default=config_data.get(CONF_ENABLE_DRIVER_VENT, True) 
             ): bool,
             
             # 2. Passenger Vent Toggle
             vol.Optional(
                 CONF_ENABLE_PASSENGER_VENT, 
-                default=self.config_data.get(CONF_ENABLE_PASSENGER_VENT, True)
+                # Use the combined config_data to get the current state
+                default=config_data.get(CONF_ENABLE_PASSENGER_VENT, True)
             ): bool,
 
             # 3. Battery Capacity (NEW)
             vol.Required(
                 CONF_MAX_BATTERY_CAPACITY_KWH,
-                default=self.config_data.get(CONF_MAX_BATTERY_CAPACITY_KWH, DEFAULT_MAX_BATTERY_CAPACITY_KWH)
+                # Use the combined config_data to get the current state
+                default=config_data.get(CONF_MAX_BATTERY_CAPACITY_KWH, DEFAULT_MAX_BATTERY_CAPACITY_KWH)
             ): vol.All(vol.Coerce(float), vol.Range(min=20.0, max=100.0)),
         })
 

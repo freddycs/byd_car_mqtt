@@ -10,9 +10,10 @@ from .const import (
     DOMAIN, 
     BYD_UPDATE_EVENT, 
     # Use the more explicit name for the subscribe topic
-    CONF_MQTT_TOPIC_SUBSCRIBE, # ⬅️ Assuming this is the correct constant for the subscribe topic
-    CONF_MQTT_TOPIC_COMMAND,   # ⬅️ NEW
-    CONF_CAR_UNIQUE_ID,        # ⬅️ NEW
+    CONF_MQTT_TOPIC_SUBSCRIBE,
+    CONF_MQTT_TOPIC_COMMAND,
+    CONF_CAR_UNIQUE_ID,
+    CONF_MAX_BATTERY_CAPACITY_KWH, # ⬅️ NEW: Import the battery capacity constant
     PLATFORMS
 )
 from .parsing_logic import parse_byd_payload 
@@ -26,19 +27,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
     
     # -----------------------------------------------------------------
-    # 1. Retrieve and Store Configuration Data
+    # 1. Retrieve and Store Configuration Data (Merge data and options)
     # -----------------------------------------------------------------
     
-    # Get the subscription topic from the UI configuration (using the corrected key)
-    mqtt_topic_subscribe = entry.data.get(CONF_MQTT_TOPIC_SUBSCRIBE)
-    mqtt_topic_command = entry.data.get(CONF_MQTT_TOPIC_COMMAND) # ⬅️ NEW
-    car_unique_id = entry.data.get(CONF_CAR_UNIQUE_ID)           # ⬅️ NEW
+    # Create a unified configuration dictionary: entry.options overrides entry.data
+    # This ensures that changes made via the Options Flow are respected.
+    config = dict(entry.data)
+    config.update(entry.options) 
     
-    # Store all necessary configuration for other platforms (like fan.py) to access
+    # Retrieve all necessary configuration values from the merged dictionary
+    mqtt_topic_subscribe = config.get(CONF_MQTT_TOPIC_SUBSCRIBE)
+    mqtt_topic_command = config.get(CONF_MQTT_TOPIC_COMMAND)
+    car_unique_id = config.get(CONF_CAR_UNIQUE_ID)
+    
+    # ⬅️ NEW: Retrieve the maximum battery capacity
+    max_battery_capacity = config.get(CONF_MAX_BATTERY_CAPACITY_KWH)
+    
+    # Store all necessary configuration for other platforms (like fan.py, sensor.py) to access
     hass.data[DOMAIN][entry.entry_id] = {
         CONF_MQTT_TOPIC_SUBSCRIBE: mqtt_topic_subscribe,
         CONF_MQTT_TOPIC_COMMAND: mqtt_topic_command,
         CONF_CAR_UNIQUE_ID: car_unique_id,
+        # ⬅️ NEW: Store the configurable battery capacity for sensor.py
+        CONF_MAX_BATTERY_CAPACITY_KWH: max_battery_capacity, 
         "parsed_data": {} # Initial status data store
     }
     
@@ -92,7 +103,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # -----------------------------------------------------------------
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # -----------------------------------------------------------------
+    # 5. Add Update Listener (Necessary for Options Flow to Reload)
+    # -----------------------------------------------------------------
+    # This tells Home Assistant to call async_unload_entry and then async_setup_entry
+    # whenever the user saves changes in the Options Flow.
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
     return True
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry."""
+    # This function is the callback for the update listener
+    await hass.config_entries.async_reload(entry.entry_id)
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Handle removal of an entry. Unloading platforms first."""
