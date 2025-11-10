@@ -1,0 +1,6 @@
+{
+  "name": "BYD Car MQTT Integration",
+  "homeassistant": "2025.11.1",
+  "country": "MY",
+  "persistent_directory": "settings"
+}
