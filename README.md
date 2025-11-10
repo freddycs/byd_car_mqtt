@@ -106,7 +106,5 @@ logger:
   default: warning
   logs:
     custom_components.byd_car_mqtt: debug
-```yaml
 
----
 
