@@ -30,17 +30,30 @@ CONF_MAX_BATTERY_CAPACITY_KWH = "max_battery_capacity_kwh"
 # Default capacity (A common value like the Dolphin/Atto 3 Extended Range)
 DEFAULT_MAX_BATTERY_CAPACITY_KWH = 60.48 
 
-# --- REMOVED: DOLPHIN_MAX_BATTERY_CAPACITY_KWH constant is now replaced by the two above.
 # -------------------------------------------------------------
+# --- CUSTOM SERVICE CONSTANTS (Used by __init__.py and button.py) ---
+# The service name registered in __init__.py
+SERVICE_GET_DILAUNCHER_JSON = "get_dilauncher_json"
+# The attribute used in the service call
+ATTR_OUTPUT_PATH = "output_path"
+# The default file path for the generated JSON, relative to the HA config folder.
+# NOTE: Changed to the config root for easier access/discovery.
+DEFAULT_OUTPUT_PATH = "dilauncher_automations.json"
 
 
 # Platforms this integration supports
 # Use the Platform enum constants instead of strings
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.FAN, Platform.NUMBER, Platform.COVER] 
+PLATFORMS = [
+    Platform.SENSOR, 
+    Platform.BINARY_SENSOR, 
+    Platform.FAN, 
+    Platform.NUMBER, 
+    Platform.COVER, 
+    Platform.BUTTON
+] 
 
 # ======================================================================
 # --- Sensor Data Keys (Used by sensor.py and parsing_logic.py) ---
-# ======================================================================
 # ... (existing sensor keys) ...
 
 # ⬅️ FAN SENSOR KEY
@@ -49,7 +62,6 @@ ATTR_FAN_SPEED = "fan_speed"
 
 # ======================================================================
 # --- Binary Sensor Data Keys (Used by binary_sensor.py) ---
-# ======================================================================
 # ... (existing binary sensor keys) ...
 
 # Configuration Keys for Config Flow (MUST BE PRESENT)

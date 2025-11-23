@@ -1,0 +1,10 @@
+get_dilauncher_json:
+  name: Generate DiLauncher Automations JSON
+  description: Generates the JSON configuration file for the BYD DiLauncher application, based on the integration's status topic, and saves it to the Home Assistant config directory.
+  fields:
+    output_path:
+      name: Output Path
+      description: The path (relative to the Home Assistant config directory) where the JSON file will be saved. This is usually config/ or a subdirectory.
+      required: false
+      example: config/byd_dilauncher_automations.json
+      default: config/byd_dilauncher_automations.json

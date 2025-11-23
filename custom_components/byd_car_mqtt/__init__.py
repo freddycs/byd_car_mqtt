@@ -1,88 +1,175 @@
 ﻿"""The component setup file for BYD Car MQTT integration."""
 import logging
+import json 
+from functools import partial
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
 import homeassistant.components.mqtt as mqtt
 from homeassistant.const import Platform
+import voluptuous as vol
+from datetime import datetime
 
 # Import local modules
 from .const import (
     DOMAIN, 
     BYD_UPDATE_EVENT, 
-    # Use the more explicit name for the subscribe topic
     CONF_MQTT_TOPIC_SUBSCRIBE,
-    CONF_MQTT_TOPIC_COMMAND,
-    CONF_CAR_UNIQUE_ID,
-    CONF_MAX_BATTERY_CAPACITY_KWH, # ⬅️ NEW: Import the battery capacity constant
-    PLATFORMS
+    CONF_MQTT_TOPIC_COMMAND,   
+    CONF_CAR_UNIQUE_ID,       
+    PLATFORMS,
+    # --- Service Constants ---
+    SERVICE_GET_DILAUNCHER_JSON,
+    ATTR_OUTPUT_PATH,
+    DEFAULT_OUTPUT_PATH
 )
 from .parsing_logic import parse_byd_payload 
 
 _LOGGER = logging.getLogger(__name__)
 
+# -----------------------------------------------------------------
+# CUSTOM SERVICE DEFINITIONS
+# -----------------------------------------------------------------
+
+# Define the service schema for the DiLauncher JSON generation
+SERVICE_DILAUNCHER_JSON_SCHEMA = vol.Schema({
+    vol.Optional(
+        ATTR_OUTPUT_PATH, 
+        default=DEFAULT_OUTPUT_PATH
+    ): str,
+})
+
+async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
+    """
+    Handles the service call to generate the complete DiLauncher Automations JSON file.
+    
+    Dynamically generates entries for AC Temp (17-33) and Fan Speed (0-7).
+    """
+    output_path = call.data.get(ATTR_OUTPUT_PATH, DEFAULT_OUTPUT_PATH)
+    
+    # Get configuration data to use in JSON generation (using the first available entry)
+    config_entry_id = next(iter(hass.data[DOMAIN]), None)
+    if not config_entry_id:
+        _LOGGER.error("BYD Car MQTT is not configured. Cannot generate DiLauncher JSON.")
+        return
+
+    config_data = hass.data[DOMAIN][config_entry_id]
+    # Ensure base_topic is clean for use in the MQTT runTask path
+    base_topic = config_data.get(CONF_MQTT_TOPIC_SUBSCRIBE, "dolphinc").strip('/')
+    
+    # ------------------------------------------------------------
+    # 1. Dynamic JSON Content Generation (Full Range)
+    # ------------------------------------------------------------
+    json_entries = []
+    
+    # Generate AC Temperature entries (17 to 33 inclusive)
+    # taskType 54 = Climate Control Temperature
+    for temp in range(17, 34): 
+        json_entries.append({
+            "name": f"AC temperature {temp}",
+            "state": 1,
+            "delayTime": 1,
+            "runTask": f"MQTT:/{base_topic}/actemp+{temp}",
+            "conditions": [{
+                "taskType": 54,
+                "compareType": 4,
+                "expect": temp
+            }]
+        })
+
+    # Generate Fan Speed entries (0 to 7 inclusive)
+    # taskType 35 = Fan Speed
+    for speed in range(0, 8):
+        json_entries.append({
+            "name": f"fan speed {speed}",
+            "state": 1,
+            "delayTime": 1,
+            "runTask": f"MQTT:/{base_topic}/fanspeed+{speed}",
+            "conditions": [{
+                "taskType": 35,
+                "compareType": 4,
+                "expect": speed
+            }]
+        })
+        
+    # Final JSON content string
+    final_json_content = json.dumps(json_entries)
+    
+    # ------------------------------------------------------------
+    # 2. File Writing Logic (in executor thread)
+    # ------------------------------------------------------------
+    def write_file():
+        """Synchronously writes the formatted JSON to the specified path, safely."""
+        # Use hass.config.path() to resolve the path relative to the HA config folder.
+        resolved_path = hass.config.path(output_path)
+        
+        _LOGGER.info("Attempting to write COMPLETE DiLauncher JSON to ABSOLUTE path: %s", resolved_path)
+        
+        try:
+            # Write the formatted JSON to the file, using indent=4 for readability
+            with open(resolved_path, "w", encoding="utf-8") as f:
+                # We dump the list of dictionaries directly, ensuring proper JSON structure
+                json.dump(json_entries, f, indent=4, ensure_ascii=False)
+            
+            _LOGGER.info("DiLauncher JSON successfully written to %s", output_path)
+            
+        except Exception as e:
+            _LOGGER.error("Failed to write DiLauncher JSON to %s (Absolute Path: %s): %s", output_path, resolved_path, e)
+            
+    # File I/O MUST be scheduled on the executor
+    await hass.async_add_executor_job(write_file)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up BYD Car MQTT from a config entry."""
     
-    # Store the component's global data (including configuration)
     hass.data.setdefault(DOMAIN, {})
     
     # -----------------------------------------------------------------
-    # 1. Retrieve and Store Configuration Data (Merge data and options)
+    # 1. Retrieve and Store Configuration Data
     # -----------------------------------------------------------------
     
-    # Create a unified configuration dictionary: entry.options overrides entry.data
-    # This ensures that changes made via the Options Flow are respected.
-    config = dict(entry.data)
-    config.update(entry.options) 
+    mqtt_topic_subscribe = entry.data.get(CONF_MQTT_TOPIC_SUBSCRIBE)
+    mqtt_topic_command = entry.data.get(CONF_MQTT_TOPIC_COMMAND) 
+    car_unique_id = entry.data.get(CONF_CAR_UNIQUE_ID)
     
-    # Retrieve all necessary configuration values from the merged dictionary
-    mqtt_topic_subscribe = config.get(CONF_MQTT_TOPIC_SUBSCRIBE)
-    mqtt_topic_command = config.get(CONF_MQTT_TOPIC_COMMAND)
-    car_unique_id = config.get(CONF_CAR_UNIQUE_ID)
-    
-    # ⬅️ NEW: Retrieve the maximum battery capacity
-    max_battery_capacity = config.get(CONF_MAX_BATTERY_CAPACITY_KWH)
-    
-    # Store all necessary configuration for other platforms (like fan.py, sensor.py) to access
+    # Store the essential data for platforms to access
     hass.data[DOMAIN][entry.entry_id] = {
         CONF_MQTT_TOPIC_SUBSCRIBE: mqtt_topic_subscribe,
         CONF_MQTT_TOPIC_COMMAND: mqtt_topic_command,
         CONF_CAR_UNIQUE_ID: car_unique_id,
-        # ⬅️ NEW: Store the configurable battery capacity for sensor.py
-        CONF_MAX_BATTERY_CAPACITY_KWH: max_battery_capacity, 
-        "parsed_data": {} # Initial status data store
+        # Pass through the rest of the configuration data
+        **entry.data, 
+        **entry.options
     }
-    
-    _LOGGER.debug("Starting BYD Car MQTT integration for topic: %s", mqtt_topic_subscribe)
 
     # -----------------------------------------------------------------
-    # 2. Define the MQTT Message Handler Callback
+    # 2. Register Custom Service (DiLauncher JSON Generation)
+    # -----------------------------------------------------------------
+    
+    # Use functools.partial to bind 'hass' to the first argument of the coroutine.
+    service_handler_with_hass = partial(async_handle_get_dilauncher_json, hass)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_DILAUNCHER_JSON,
+        service_handler_with_hass,
+        schema=SERVICE_DILAUNCHER_JSON_SCHEMA,
+    )
+    _LOGGER.debug("Registered custom service: %s.%s", DOMAIN, SERVICE_GET_DILAUNCHER_JSON)
+
+
+    # -----------------------------------------------------------------
+    # 3. Define the MQTT Message Handler
     # -----------------------------------------------------------------
     @callback
     def mqtt_message_received(message):
-        """Handle new MQTT messages received on the configured topic."""
-        raw_payload = message.payload
-        
-        # --- Safely decode payload ---
-        if isinstance(raw_payload, bytes):
-            try:
-                raw_payload = raw_payload.decode("utf-8")
-            except UnicodeDecodeError:
-                _LOGGER.error("Failed to decode MQTT payload as UTF-8.")
-                return
-
-        if not isinstance(raw_payload, str):
-            _LOGGER.warning("MQTT payload received was not a string, ignoring.")
-            return
-
+        """Handle new MQTT messages received on the status topic."""
         try:
-            parsed_data = parse_byd_payload(raw_payload)
+            # Parse the raw text payload
+            parsed_data = parse_byd_payload(message.payload)
             
-            # Use car_status check for better detection of a valid payload
-            if parsed_data.get("car_status") is not None: 
-                _LOGGER.debug("Parsed data: %s", parsed_data)
-                
-                # Fire the custom event with the clean data for all sensors to listen to
+            if parsed_data:
+                _LOGGER.debug("Payload successfully parsed: %s", parsed_data)
                 hass.bus.async_fire(BYD_UPDATE_EVENT, parsed_data)
             else:
                 _LOGGER.debug("Payload received but key data not found/parsed.")
@@ -91,41 +178,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.error("Error processing MQTT message: %s", err)
 
     # -----------------------------------------------------------------
-    # 3. Subscribe to the MQTT Topic
+    # 4. Subscribe to the MQTT Topic
     # -----------------------------------------------------------------
-    # Use the subscribe topic variable
     entry.async_on_unload(
         await mqtt.async_subscribe(hass, mqtt_topic_subscribe, mqtt_message_received, qos=0)
     )
 
     # -----------------------------------------------------------------
-    # 4. Forward Setup to All Platforms (including the new 'fan' platform)
+    # 5. Forward Setup to All Platforms
     # -----------------------------------------------------------------
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # -----------------------------------------------------------------
-    # 5. Add Update Listener (Necessary for Options Flow to Reload)
-    # -----------------------------------------------------------------
-    # This tells Home Assistant to call async_unload_entry and then async_setup_entry
-    # whenever the user saves changes in the Options Flow.
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-
     return True
-
-async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload config entry."""
-    # This function is the callback for the update listener
-    await hass.config_entries.async_reload(entry.entry_id)
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Handle removal of an entry. Unloading platforms first."""
     
-    # Unload platforms (sensor, binary_sensor, fan)
+    # 1. Unload platforms 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    # MQTT subscription cleanup is handled automatically by entry.async_on_unload
-    
-    # Clean up stored data
+    # 2. Unregister custom service 
+    if hass.services.has_service(DOMAIN, SERVICE_GET_DILAUNCHER_JSON):
+        hass.services.async_remove(DOMAIN, SERVICE_GET_DILAUNCHER_JSON)
+        _LOGGER.debug("Unregistered custom service: %s.%s", DOMAIN, SERVICE_GET_DILAUNCHER_JSON)
+
+    # 3. Clean up stored data
     if unload_ok and entry.entry_id in hass.data[DOMAIN]:
         hass.data[DOMAIN].pop(entry.entry_id)
 
