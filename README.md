@@ -82,35 +82,53 @@ After installation via HACS, configure the integration via the Home Assistant UI
 | Field | Description | Example Value |
 | :--- | :--- | :--- |
 | **Car Name** | A friendly name for your car (e.g., Dolphin, Atto 3). | `BYD Dolphin` |
-| **MQTT Subscribe Topic** | The **base topic** the external telemetry sender uses. | `homeassistant/car/dolphinc` |
-| **MQTT Command Topic** | The topic used by Home Assistant to send control commands back to the car (e.g., setting A/C temperature). | `homeassistant/car/command` |
+| **MQTT Subscribe Topic** | The **base topic** the external telemetry sender uses. | `/dolphin_status` |
+| **MQTT Command Topic** | The topic used by Home Assistant to send control commands back to the car (e.g., setting A/C temperature). | `/dolphin_command` |
 | **Car Unique ID** | A unique identifier for your car (can be VIN or any persistent ID). | `V-1234567890` |
 | **Max Battery Capacity (kWh)** | The nominal capacity of your vehicle's battery pack. | `60.48` |
 
-5.  Click **SUBMIT** to complete the setup. The integration will automatically subscribe to the necessary subtopics (`/SOC` for real-time updates and the main topic for status reports).
+5.   Click **SUBMIT** to go to the next page, check on the `enable_driver_vent` or `enable_passenger_vent` checkbox if your car is equipped with seat ventilation.
+
+6.    Click **SUBMIT** to complete the setup. The integration will automatically subscribe to the necessary subtopics (`/SOC` for real-time updates and the main topic for status reports).
+---
+
+## ⬇️Download & install DiLauncher 迪粉桌面
+1. Download `迪粉桌面-v2.5.1122.86.66-0900_sign.apk` or the latest version from the developer's official repository https://drive.uc.cn/s/bc4778b7d0db4#/list/share.
+
+2. Transfer the downloaded `迪粉桌面-v2.5.1122.86.66-0900_sign.apk` or the latest version file onto a USB drive. Sideload and install the apk in your BYD head unit. Refer to the official installation guide https://shorturl.at/3TIQG.
+
+## Configure MQTT Connection in DiLauncher 迪粉桌面
+1. Go to `Settings (设置）`then select `Add-ins (插件扩展）`from the settings menu.
+
+2. On the right side of the Add-ins Configuration screen, enter the following details:
+
+| Field | Description | Example Value |
+| :--- | :--- | :--- |
+| **启动MQTT功能（关闭打开可以重新连接)** | Toggle switch to enable or disable MQTT function | `turn off and turn on will reconnect to the MQTT broker` |
+| **爱车别名** | A friendly name for your car (e.g., Dolphin, Atto 3). | `BYD Dolphin` |
+| **服务器** | Your Home Assistant server address. | `https://homeassistant.duckdns.org` |
+| **端口** | Your MQTT broker port number. | `1883` |
+| **账号** | Your MQTT username. | `byd` |
+| **密码** | Your MQTT password. | `abc123` |
+| **接收信息的主题** | **MQTT Subscribe Topic** - The **base topic** the external telemetry sender uses. | `/dolphin_status` |
+| **发送信息的主题** | **MQTT Command Topic** - The topic used by Home Assistant to send control commands back to the car (e.g., setting A/C temperature). | `/dolphin_command` |
+| **链接方式** | Toggle switch for connection type (TCP or SSL) | `TCP` |
 
 ---
-## 🔧 DiLauncher Automations Setup (AC Temp & Fan Speed)
+## 🔧 DiLauncher Automations Setup (Battery SOC, AC Temperature & Fan Speed)
 
-This integration provides a dedicated service to generate a complete JSON file containing all necessary "Conditional Tasks" for the DiLauncher application to enable control over **AC Temperature** and **Fan Speed** via MQTT.
+This integration provides a dedicated service to generate a complete JSON file containing all necessary "Conditional Tasks" for the DiLauncher application to send the latest state of **Battery SOC**, **AC Temperature** and **Fan Speed** via MQTT to Home Assistant.
      
 **1. Generating the JSON File**
-   1. Navigate to Developer Tools in Home Assistant.
+   1. Navigate to `Settings` in Home Assistant.
    
-   2. Go to the Services tab.
+   2. Select `Devices & Services`.
   
-   3. In the "Service" field, select: `byd_car_mqtt.get_dilauncher_json`.
+   3. Go to `BYD Car MQTT Status` integration and select your car model.
  
-   4. (Optional) You can specify the output file path in the **YAML mode**. If left blank, it defaults to `/config/dilauncher_automations.json`.
-  
-   `
-output_path: dilauncher_automations.json
-` 
-
-   5. Click CALL SERVICE.
-
-
-This action will create a file named `dilauncher_automations.json` (or the name you specified) in your Home Assistant configuration directory (`/config`). This file contains 25 entries: 17 for AC temperatures (17°C to 33°C) and 8 for fan speeds (0 to 7).
+   4. Under the Controls section, click on the `Generate DiLauncher Automations JSON` **Press** button.
+   
+This action will create a file named `dilauncher_automations.json` in your Home Assistant configuration directory (`/config`). This file contains 25 entries: 17 for AC temperatures (17°C to 33°C) and 8 for fan speeds (0 to 7).
 
 ## 2. Retrieving and Importing the File
 
