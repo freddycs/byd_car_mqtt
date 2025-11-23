@@ -57,7 +57,7 @@ Before installing this integration, you **must** have the following running:
 
 3.  Click the three dots (`...`) in the top right corner and select **Custom repositories**.
 
-4.  Enter the URL of this GitHub repository.
+4.  Enter the URL of this GitHub repository (`https://github.com/freddycs/byd_car_mqtt`).
 
 5.  Select **Integration** as the category.
 
@@ -88,7 +88,54 @@ After installation via HACS, configure the integration via the Home Assistant UI
 | **Max Battery Capacity (kWh)** | The nominal capacity of your vehicle's battery pack. | `60.48` |
 
 5.  Click **SUBMIT** to complete the setup. The integration will automatically subscribe to the necessary subtopics (`/SOC` for real-time updates and the main topic for status reports).
-6.  
+
+---
+## 🔧 DiLauncher Automations Setup (AC Temp & Fan Speed)
+
+This integration provides a dedicated service to generate a complete JSON file containing all necessary "Conditional Tasks" for the DiLauncher application to enable control over **AC Temperature** and **Fan Speed** via MQTT.
+     
+**1. Generating the JSON File**
+   1. Navigate to Developer Tools in Home Assistant.
+   
+   2. Go to the Services tab.
+  
+   3. In the "Service" field, select: `byd_car_mqtt.get_dilauncher_json`.
+ 
+   4. (Optional) You can specify the output file path in the **YAML mode**. If left blank, it defaults to `/config/dilauncher_automations.json`.
+  
+   `
+output_path: dilauncher_automations.json
+` 
+
+   5. Click CALL SERVICE.
+
+
+This action will create a file named `dilauncher_automations.json` (or the name you specified) in your Home Assistant configuration directory (`/config`). This file contains 25 entries: 17 for AC temperatures (17°C to 33°C) and 8 for fan speeds (0 to 7).
+
+## 2. Retrieving and Importing the File
+
+1. **Retrieve the File**: Access the file you just generated (`/config/dilauncher_automations.json`).
+
+   - If you use the **File Editor** add-on, you can navigate directly to the file and download it.
+
+   - If you use **Samba/SSH**, you can copy the file from the root of your Home Assistant configuration directory.
+
+2. **Transfer to Car**: Transfer the downloaded `dilauncher_automations.json` file onto a USB drive.
+
+3. **Import in DiLauncher**:
+
+   - Insert the USB drive into your car's head unit.
+ 
+   - Copy the `dilauncher_automations.json` file to `\download\s` folder in local storage.
+
+   - Open the DiLauncher application.
+
+   - Navigate to the **Conditional Tasks** (or **Task List**) settings.
+
+   - Find the **Import** or **Restore** function and select the JSON file from the USB drive.
+
+Once imported, DiLauncher will have all the necessary conditional tasks configured to listen for the MQTT commands published by Home Assistant, allowing you to control the climate entities.
+
 ---
 
 ## ⚠️ Disclaimer
