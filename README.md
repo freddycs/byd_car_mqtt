@@ -126,7 +126,7 @@ This integration provides a dedicated service to generate a complete JSON file c
   
    3. Go to `BYD Car MQTT Status` integration and select your car model.
  
-   4. Under the Controls section, click on the `Generate DiLauncher Automations JSON` **Press** button.
+   4. Under the Controls section, click on the `Generate DiLauncher Automations JSON` button.
    
 This action will create a file named `dilauncher_automations.json` in your Home Assistant configuration directory (`/config`). This file contains 25 entries: 17 for AC temperatures (17°C to 33°C) and 8 for fan speeds (0 to 7).
 
@@ -144,15 +144,15 @@ This action will create a file named `dilauncher_automations.json` in your Home 
 
    - Insert the USB drive into your car's head unit.
  
-   - Copy the `dilauncher_automations.json` file to `\download\s` folder in local storage.
+   - Copy the `dilauncher_automations.json` file to `\download\s` folder in the local storage.
 
    - Open the DiLauncher application.
 
-   - Navigate to the **Conditional Tasks** (or **Task List**) settings.
+   - Navigate to the **Settings 设置** menu and select **Conditional Tasks 条件联动**.
 
-   - Find the **Import** or **Restore** function and select the JSON file from the USB drive.
+   - Click on **Import Automation 导入智能场景** button and select the JSON file from `/download/s` folder.
 
-Once imported, DiLauncher will have all the necessary conditional tasks configured to listen for the MQTT commands published by Home Assistant, allowing you to control the climate entities.
+Once imported, DiLauncher will have all the necessary conditional tasks configured to send MQTT message to Home Assistant, updating the state of the AC Temperature, Battery SOC and Fan Speed.
 
 ---
 
