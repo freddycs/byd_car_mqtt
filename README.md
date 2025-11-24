@@ -133,7 +133,7 @@ After installation via HACS, configure the integration via the Home Assistant UI
 | **链接方式** | Toggle switch for connection type (TCP or SSL) | `TCP` |
 
 ---
-## 🔧 DiLauncher Automations Setup (Battery SOC, AC Temperature & Fan Speed)
+## 🔧 DiLauncher Automations Setup (Battery SOC, Speed, AC Temperature & Fan Speed)
 
 This integration provides a dedicated service to generate a complete JSON file containing all necessary "Conditional Tasks" for the DiLauncher application to send the latest state of **Battery SOC**, **AC Temperature** and **Fan Speed** via MQTT to Home Assistant.
      
@@ -146,7 +146,7 @@ This integration provides a dedicated service to generate a complete JSON file c
  
    4. Under the Controls section, click on the `Generate DiLauncher Automations JSON` button.
    
-This action will create a file named `dilauncher_automations.json` in your Home Assistant configuration directory (`/config`). This file contains 25 entries: 17 for AC temperatures (17°C to 33°C) and 8 for fan speeds (0 to 7).
+This action will create a file named `dilauncher_automations.json` in your Home Assistant configuration directory (`/config`). This file contains 307 entries: 181 for speed, 101 for SoC, 17 for AC temperatures (17°C to 33°C) and 8 for fan speeds (0 to 7).
 
 ## 2. Retrieving and Importing the File
 
