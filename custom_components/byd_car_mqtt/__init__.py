@@ -14,8 +14,8 @@ from .const import (
     DOMAIN, 
     BYD_UPDATE_EVENT, 
     CONF_MQTT_TOPIC_SUBSCRIBE,
-    CONF_MQTT_TOPIC_COMMAND,   
-    CONF_CAR_UNIQUE_ID,       
+    CONF_MQTT_TOPIC_COMMAND, 
+    CONF_CAR_UNIQUE_ID,      
     PLATFORMS,
     # --- Service Constants ---
     SERVICE_GET_DILAUNCHER_JSON,
@@ -47,8 +47,8 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
     output_path = call.data.get(ATTR_OUTPUT_PATH, DEFAULT_OUTPUT_PATH)
     
     # Get configuration data to use in JSON generation (using the first available entry)
-    config_entry_id = next(iter(hass.data[DOMAIN]), None)
-    if not config_entry_id:
+    config_entry_id = next(iter(hass.data.get(DOMAIN, {})), None)
+    if not config_entry_id or config_entry_id not in hass.data[DOMAIN]:
         _LOGGER.error("BYD Car MQTT is not configured. Cannot generate DiLauncher JSON.")
         return
 
@@ -106,7 +106,7 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
             }]
         })
 
-    # --- ADDED: Generate Speed entries (0 to 180 inclusive) ---
+    # Generate Speed entries (0 to 180 inclusive)
     # taskType 11 = Speed
     for speed in range(0, 181):
         json_entries.append({
@@ -122,10 +122,11 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
             }]
         })
     # ---------------------------------------------------------
-        
-    # Final JSON content string (only used for temporary variable assignment here)
-    final_json_content = json.dumps(json_entries)
     
+    # Log total count for confirmation
+    total_entries = len(json_entries)
+    _LOGGER.info("Generated %d total DiLauncher automation entries (AC Temp, Fan Speed, SOC, Speed).", total_entries)
+        
     # ------------------------------------------------------------
     # 2. File Writing Logic (in executor thread)
     # ------------------------------------------------------------
@@ -145,7 +146,8 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
             _LOGGER.info("DiLauncher JSON successfully written to %s", output_path)
             
         except Exception as e:
-            _LOGGER.error("Failed to write DiLauncher JSON to %s (Absolute Path: %s): %s", output_path, resolved_path, e)
+            # Using _LOGGER.exception() is generally better for file I/O errors as it includes the stack trace.
+            _LOGGER.exception("Failed to write DiLauncher JSON to %s (Absolute Path: %s): %s", output_path, resolved_path, e)
             
     # File I/O MUST be scheduled on the executor
     await hass.async_add_executor_job(write_file)
@@ -202,12 +204,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             
             if parsed_data:
                 _LOGGER.debug("Payload successfully parsed: %s", parsed_data)
+                # Fire a Home Assistant event containing the parsed data
                 hass.bus.async_fire(BYD_UPDATE_EVENT, parsed_data)
             else:
                 _LOGGER.debug("Payload received but key data not found/parsed.")
                 
-        except Exception as err:
-            _LOGGER.error("Error processing MQTT message: %s", err)
+        except Exception:
+            # Use _LOGGER.exception() to log the full stack trace for better debugging
+            _LOGGER.exception("Error processing MQTT message for topic: %s", message.topic)
 
     # -----------------------------------------------------------------
     # 4. Subscribe to the MQTT Topic
