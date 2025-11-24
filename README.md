@@ -23,16 +23,32 @@ This integration is purely a **data consumer** and does not directly poll or com
 
 The integration processes the telemetry data and exposes the following entities in Home Assistant. Note the distinction between real-time data and data that is only updated during power cycles.
 
-| Sensor | Description | Unit | Update Frequency |
+| Sensor | Description | Unit / State | Update Frequency |
 | :--- | :--- | :--- | :--- |
+| **Battery SoH** | Battery State of Health (SoH). | % | Asynchronous (On Power Cycle / Status Report) |
 | **Battery Level** | Real-time State of Charge (SoC). | % | **Real-Time** (Direct MQTT `/SOC` topic) |
 | **Current Battery Energy** | Estimated current energy remaining based on SoC and configured max capacity. | kWh | **Real-Time** (Direct MQTT `/SOC` topic) |
+| **Car Status** | Current state of the car | Started / Idle / Driving / Powered Off | **Real-Time** (Direct MQTT `/speed` topic) |
+| **Speed** | Current speed of the car | km/h / mph | **Real-Time** (Direct MQTT `/speed` topic) |
 | **Total Mileage** | Vehicle odometer reading. | km | Asynchronous (On Power Cycle / Status Report) |
 | **Remaining Range** | Estimated remaining driving range. | km | Asynchronous (On Power Cycle / Status Report) |
 | **Car Status** | Current state (Idle, Driving, Powered Off, etc.). | Enum | Asynchronous (On Power Cycle / Status Report) |
 | **TPMS (4 Tires)** | Individual tire pressures. | kPa | Asynchronous (On Power Cycle / Status Report) |
 | **Tire Temperatures (4 Tires)** | Individual tire temperatures. | °C | Asynchronous (On Power Cycle / Status Report) |
+| **Windows Open (4 windows)** | Individual window's state. | Open/Close | Asynchronous (On Power Cycle / Status Report) |
+| **Sunroof Panel Open** | Sunroof panel's state. | Open/Close | Asynchronous (On Power Cycle / Status Report) |
 | **External Temperature** | Current outside temperature. | °C | Asynchronous (On Power Cycle / Status Report) |
+
+The integration also allows the following controls of your car.
+| Controls | On / Off  | Control Type | 
+| :--- | :--- | :--- |
+| **A/C Fan Speed** | Yes | Slider (0 - 100%) | 
+| **A/C Target Temp** | No | Slider (17°C - 33°C) |
+| **Driver Vent** | Yes | Off / Low / High |
+| **Passenger Vent** | Yes | Off / Low / High |
+| **Sunroof Blind** | Open / Close | Slider (0% - 100%) |
+| **Generate DiLauncher Automations JSON** | No | Press to generate |
+
 
 ---
 
@@ -46,6 +62,8 @@ Before installing this integration, you **must** have the following running:
     * **CRITICAL:** The MQTT broker **must be externally accessible from the internet** and properly secured, as the DiLauncher application running inside the car sends data back to this broker over the internet. Using a secure VPN or an encrypted connection is highly recommended.
 
 3.  **The DiLauncher (迪粉桌面) Application running in your car** and configured to publish data to your external MQTT broker. *This integration is useless without the data feed from this launcher.*
+
+4. **Internet connection is required in your car** to publish data to your external MQTT broker. 
 
 ---
 
