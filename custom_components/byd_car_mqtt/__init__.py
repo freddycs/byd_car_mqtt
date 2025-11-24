@@ -42,7 +42,7 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
     """
     Handles the service call to generate the complete DiLauncher Automations JSON file.
     
-    Dynamically generates entries for AC Temp (17-33) and Fan Speed (0-7).
+    Dynamically generates entries for AC Temp (17-33), Fan Speed (0-7), SOC (0-100), AND Speed (0-180).
     """
     output_path = call.data.get(ATTR_OUTPUT_PATH, DEFAULT_OUTPUT_PATH)
     
@@ -91,7 +91,39 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
             }]
         })
         
-    # Final JSON content string
+    # Generate State of Charge (SOC) entries (0 to 100 inclusive)
+    # taskType 27 = State of Charge
+    for soc in range(0, 101):
+        json_entries.append({
+            "name": f"soc{soc}",
+            "state": 1,
+            "delayTime": 1,
+            "runTask": f"MQTT:/{base_topic}/SOC+{soc}",
+            "conditions": [{
+                "taskType": 27,
+                "compareType": 4,
+                "expect": soc
+            }]
+        })
+
+    # --- ADDED: Generate Speed entries (0 to 180 inclusive) ---
+    # taskType 11 = Speed
+    for speed in range(0, 181):
+        json_entries.append({
+            "name": f"speed{speed}",
+            "state": 1,
+            # Using 15 seconds delay as per your sample
+            "delayTime": 15, 
+            "runTask": f"MQTT:/{base_topic}/speed+{speed}",
+            "conditions": [{
+                "taskType": 11,
+                "compareType": 4,
+                "expect": speed
+            }]
+        })
+    # ---------------------------------------------------------
+        
+    # Final JSON content string (only used for temporary variable assignment here)
     final_json_content = json.dumps(json_entries)
     
     # ------------------------------------------------------------
