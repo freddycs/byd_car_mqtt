@@ -15,8 +15,11 @@ from .const import (
     BYD_UPDATE_EVENT, 
     CONF_MQTT_TOPIC_SUBSCRIBE,
     CONF_MQTT_TOPIC_COMMAND, 
-    CONF_CAR_UNIQUE_ID,      
+    CONF_CAR_UNIQUE_ID,       
     PLATFORMS,
+    # --- Subtopic Constants (NEWLY ADDED) ---
+    DEFAULT_DRIVER_VENT_SUBTOPIC,
+    DEFAULT_PASSENGER_VENT_SUBTOPIC,
     # --- Service Constants ---
     SERVICE_GET_DILAUNCHER_JSON,
     ATTR_OUTPUT_PATH,
@@ -42,7 +45,7 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
     """
     Handles the service call to generate the complete DiLauncher Automations JSON file.
     
-    Dynamically generates entries for AC Temp (17-33), Fan Speed (0-7), SOC (0-100), AND Speed (0-180).
+    Dynamically generates entries for AC Temp, Fan Speed, SOC, Speed, and Seat Ventilation.
     """
     output_path = call.data.get(ATTR_OUTPUT_PATH, DEFAULT_OUTPUT_PATH)
     
@@ -121,11 +124,47 @@ async def async_handle_get_dilauncher_json(hass: HomeAssistant, call):
                 "expect": speed
             }]
         })
+
+    # --- NEW: Generate Driver Seat Ventilation entries (0=Off, 1=Low, 2=High) ---
+    # taskType 21 = Driver Seat Ventilation
+    VENT_LEVELS = {0: "off", 1: "low", 2: "high"}
+    for level, name in VENT_LEVELS.items():
+        delay = 1 # Using 1s for all driver vents as per your samples
+        json_entries.append({
+            "name": f"Driver ventilation {name}",
+            "state": 1,
+            "delayTime": delay, 
+            "runDelayTime": 0,
+            "runTask": f"MQTT:/{base_topic}/{DEFAULT_DRIVER_VENT_SUBTOPIC}+{level}",
+            "conditions": [{
+                "taskType": 21,
+                "compareType": 4,
+                "expect": level
+            }]
+        })
+
+    # --- NEW: Generate Passenger Seat Ventilation entries (0=Off, 1=Low, 2=High) ---
+    # taskType 22 = Passenger Seat Ventilation
+    for level, name in VENT_LEVELS.items():
+        # Using 10s delay only for passenger OFF, 1s for the rest, as per your samples
+        delay = 10 if level == 0 else 1 
+        json_entries.append({
+            "name": f"passenger seat ventilation {name}",
+            "state": 1,
+            "delayTime": delay,
+            "runDelayTime": 0,
+            "runTask": f"MQTT:/{base_topic}/{DEFAULT_PASSENGER_VENT_SUBTOPIC}+{level}",
+            "conditions": [{
+                "taskType": 22,
+                "compareType": 4,
+                "expect": level
+            }]
+        })
     # ---------------------------------------------------------
     
     # Log total count for confirmation
     total_entries = len(json_entries)
-    _LOGGER.info("Generated %d total DiLauncher automation entries (AC Temp, Fan Speed, SOC, Speed).", total_entries)
+    _LOGGER.info("Generated %d total DiLauncher automation entries (AC Temp, Fan Speed, SOC, Speed, Seat Ventilation).", total_entries)
         
     # ------------------------------------------------------------
     # 2. File Writing Logic (in executor thread)
