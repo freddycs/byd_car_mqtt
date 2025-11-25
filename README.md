@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="Icon for My Integration" width="128"/>
+</p>
+
 # 🚗 BYD Car MQTT Integration for Home Assistant
 [releases-shield]: https://img.shields.io/github/release/freddycs/byd_car_mqtt.svg
 [version-shield]: https://img.shields.io/badge/version-0.1.0-blue.svg
